@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Challenges Management</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0"></script>
+    <style>
+        .table-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .sortable {
+            cursor: pointer;
+            position: relative;
+            padding-right: 20px !important;
+        }
+        
+        .sortable::after {
+            content: '↕';
+            position: absolute;
+            right: 5px;
+            color: #666;
+        }
+        
+        .sortable.asc::after {
+            content: '↑';
+        }
+        
+        .sortable.desc::after {
+            content: '↓';
+        }
+        
+        .filter-input {
+            width: 100%;
+            padding: 4px;
+            margin-top: 4px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 1rem;
+            gap: 0.5rem;
+        }
+        
+        .pagination button {
+            padding: 0.5rem 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            background-color: white;
+        }
+        
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pagination button.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <!-- Login Form -->
+        <div id="loginForm" class="mb-8 p-6 bg-white rounded-lg shadow-md">
+            <h2 class="text-2xl mb-4">Login</h2>
+            <div class="space-y-4">
+                <input type="text" id="apiUrl" placeholder="API URL" class="w-full p-2 border rounded" value="https://your-challenges-api-server">
+                <input type="email" id="email" placeholder="Email" class="w-full p-2 border rounded">
+                <input type="password" id="password" placeholder="Password" class="w-full p-2 border rounded">
+                <button onclick="login()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Login</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="mainContent" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Left Column -->
+                <div class="space-y-8">
+                    <!-- Create Challenge Form -->
+                    <div class="p-6 bg-white rounded-lg shadow-md">
+                        <h2 class="text-2xl mb-4">Create New Challenge</h2>
+                        <div class="space-y-4">
+                            <input type="text" id="challengeName" placeholder="Challenge Name" class="w-full p-2 border rounded">
+                            <input type="date" id="fromDate" class="w-full p-2 border rounded">
+                            <input type="date" id="toDate" class="w-full p-2 border rounded">
+                            <select id="challengeType" class="w-full p-2 border rounded">
+                                <option value="running">Running</option>
+                                <option value="cycling">Cycling</option>
+                                <option value="swimming">Swimming</option>
+                                <option value="hiking">Hiking</option>
+                                <option value="walking">Walking</option>
+                            </select>
+                            <button onclick="createChallenge()" class="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600">Create Challenge</button>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activities -->
+                    <div class="p-6 bg-white rounded-lg shadow-md">
+                        <h2 class="text-2xl mb-4">Recent Activities</h2>
+                        <div class="mb-4">
+                            <input type="text" id="activitiesSearchInput" placeholder="Search activities..." 
+                                   class="w-full p-2 border rounded">
+                        </div>
+                        <div class="table-container">
+                            <table class="min-w-full table-auto">
+                                <thead>
+                                    <tr class="bg-gray-100">
+                                        <th class="p-2 sortable" data-sort="challenge_id">Challenge ID</th>
+                                        <th class="p-2 sortable" data-sort="date">Date</th>
+                                        <th class="p-2 sortable" data-sort="user">User</th>
+                                        <th class="p-2 sortable" data-sort="type">Type</th>
+                                        <th class="p-2 sortable" data-sort="distance">Distance</th>
+                                    </tr>
+                                    <tr>
+                                        <th><input type="text" class="filter-input" data-column="challenge_id"></th>
+                                        <th><input type="text" class="filter-input" data-column="date"></th>
+                                        <th><input type="text" class="filter-input" data-column="user"></th>
+                                        <th><input type="text" class="filter-input" data-column="type"></th>
+                                        <th><input type="text" class="filter-input" data-column="distance"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="activitiesTableBody">
+                                    <!-- Rows will be inserted here dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="pagination" id="activitiesPagination"></div>
+                    </div>
+                </div>
+                <!-- Right Column -->
+                <div class="space-y-8">
+                    <!-- My Challenges -->
+                    <div class="p-6 bg-white rounded-lg shadow-md">
+                        <h2 class="text-2xl mb-4">My Challenges</h2>
+                        <div class="mb-4">
+                            <input type="text" id="challengesSearchInput" placeholder="Search challenges..." 
+                                   class="w-full p-2 border rounded">
+                        </div>
+                        <div class="table-container">
+                            <table class="min-w-full table-auto">
+                                <thead>
+                                    <tr class="bg-gray-100">
+                                        <th class="p-2 sortable" data-sort="name">Name</th>
+                                        <th class="p-2 sortable" data-sort="from">From</th>
+                                        <th class="p-2 sortable" data-sort="to">To</th>
+                                        <th class="p-2 sortable" data-sort="type">Type</th>
+                                        <th class="p-2 sortable" data-sort="challenge_id">ID</th>
+                                        <th class="p-2">Actions</th>
+                                    </tr>
+                                    <tr>
+                                        <th><input type="text" class="filter-input" data-column="name"></th>
+                                        <th><input type="text" class="filter-input" data-column="from"></th>
+                                        <th><input type="text" class="filter-input" data-column="to"></th>
+                                        <th><input type="text" class="filter-input" data-column="type"></th>
+                                        <th><input type="text" class="filter-input" data-column="challenge_id"></th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="challengesTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="pagination" id="challengesPagination"></div>
+                    </div>
+
+                    <!-- Shared With Me -->
+                    <div class="p-6 bg-white rounded-lg shadow-md">
+                        <h2 class="text-2xl mb-4">Challenges Shared With Me</h2>
+                        <div class="mb-4">
+                            <input type="text" id="sharedSearchInput" placeholder="Search shared challenges..." 
+                                   class="w-full p-2 border rounded">
+                        </div>
+                        <div class="table-container">
+                            <table class="min-w-full table-auto">
+                                <thead>
+                                    <tr class="bg-gray-100">
+                                        <th class="p-2 sortable" data-sort="name">Name</th>
+                                        <th class="p-2 sortable" data-sort="owner">Owner</th>
+                                        <th class="p-2 sortable" data-sort="type">Type</th>
+                                    </tr>
+                                    <tr>
+                                        <th><input type="text" class="filter-input" data-column="name"></th>
+                                        <th><input type="text" class="filter-input" data-column="owner"></th>
+                                        <th><input type="text" class="filter-input" data-column="type"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sharedChallengesTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="pagination" id="sharedChallengesPagination"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selected Challenge Details (hidden by default) -->
+            <div id="challengeDetails" class="hidden mt-8 p-6 bg-white rounded-lg shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl" id="selectedChallengeName"></h2>
+                    <h3 class="text-1xl" id="selectedChallengeDates"></h3>
+                    <div class="space-x-4">
+                        <button onclick="toggleAddRecord()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Add Record</button>
+                        <button onclick="toggleShare()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Share</button>
+                        <button onclick="removeMyRecords()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Remove My Records</button>
+                    </div>
+                </div>
+
+                <!-- Add Record Form (hidden by default) -->
+                <div id="addRecordForm" class="hidden mb-4 p-4 bg-gray-50 rounded">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <input type="datetime-local" id="recordTimestamp" class="p-2 border rounded">
+                        <input type="number" id="recordDistance" placeholder="Distance" class="p-2 border rounded" step="0.1">
+                        <input type="text" id="recordType" placeholder="Type" class="p-2 border rounded">
+                        <button onclick="addRecord()" class="bg-purple-500 text-white p-2 rounded hover:bg-purple-600">Add Record</button>
+                    </div>
+                </div>
+
+
+                <!-- Share Form (hidden by default) -->
+                <div id="shareForm" class="hidden mb-4 p-4 bg-gray-50 rounded">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <input type="email" id="shareEmail" placeholder="User Email" class="p-2 border rounded">
+                        <button onclick="shareChallenge()" class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Share Challenge</button>
+                    </div>
+                    <div class="mt-4">
+                        <h3 class="text-lg mb-2">Shared With:</h3>
+                        <ul id="sharedWithList" class="list-disc list-inside">
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-4">
+                    
+                    <!-- Challenge Records -->
+                    <div>
+                        <h3 class="text-xl mb-4">Records</h3>
+                        <div class="mb-4">
+                            <input type="text" id="recordsSearchInput" placeholder="Search records..." 
+                                   class="w-full p-2 border rounded">
+                        </div>
+                        <div class="table-container">
+                            <table class="min-w-full table-auto">
+                                <thead>
+                                    <tr class="bg-gray-100">
+                                        <th class="p-2 sortable" data-sort="user">User</th>
+                                        <th class="p-2 sortable" data-sort="date">Date</th>
+                                        <th class="p-2 sortable" data-sort="distance">Distance</th>
+                                    </tr>
+                                    <tr>
+                                        <th><input type="text" class="filter-input" data-column="user"></th>
+                                        <th><input type="text" class="filter-input" data-column="date"></th>
+                                        <th><input type="text" class="filter-input" data-column="distance"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recordsTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="pagination" id="recordsPagination"></div>
+                    </div>
+                    <!-- Progress Chart -->
+                    <div>
+                        <h3 class="text-xl mb-4">Progress</h3>
+                        <canvas id="progressChart"></canvas>
+                    </div>
+
+                    <!-- History Chart -->
+                    <div>
+                        <h3 class="text-xl mb-4">History</h3>
+                        <canvas id="historyChart"></canvas>
+                    </div>
+                    
+                    <!-- Share Visibility -->
+                    <div>
+                        <h3 class="text-xl mb-4"></h3>
+                        <div id="shareVisibilityList" class="space-y-2">
+                            <!-- Will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = '';
+        let baseUrl = '';
+        let selectedChallengeId = null;
+        let progressChart = null;
+        let historyChart = null;
+
+        // Initialize date inputs
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('fromDate').value = today;
+        });
+
+        async function login() {
+            baseUrl = document.getElementById('apiUrl').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${baseUrl}/rpc/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, pass: password })
+                });
+                const data = await response.json();
+                token = data.token;
+                
+                if (token) {
+                    document.getElementById('loginForm').classList.add('hidden');
+                    document.getElementById('mainContent').classList.remove('hidden');
+                    loadEverything();
+                }
+            } catch (error) {
+                alert('Login failed: ' + error.message);
+            }
+        }
+
+        async function loadEverything() {
+            await Promise.all([
+                loadChallenges(),
+                loadSharedChallenges(),
+                loadRecentActivities()
+            ]);
+        }
+
+
+
+
+        async function createChallenge() {
+            const name = document.getElementById('challengeName').value;
+            const from = document.getElementById('fromDate').value;
+            const to = document.getElementById('toDate').value;
+            const type = document.getElementById('challengeType').value;
+
+            try {
+                await fetch(`${baseUrl}/challenge_list`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, from, to, type })
+                });
+                loadEverything();
+                // Clear form
+                document.getElementById('challengeName').value = '';
+                document.getElementById('toDate').value = '';
+            } catch (error) {
+                alert('Failed to create challenge: ' + error.message);
+            }
+        }
+
+        async function deleteChallenge(challengeId) {
+            if (!confirm('Are you sure you want to delete this challenge?')) return;
+            
+            try {
+                await fetch(`${baseUrl}/challenge_list?challenge_id=eq.${challengeId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (selectedChallengeId === challengeId) {
+                    document.getElementById('challengeDetails').classList.add('hidden');
+                    selectedChallengeId = null;
+                }
+                loadEverything();
+            } catch (error) {
+                alert('Failed to delete challenge: ' + error.message);
+            }
+        }
+
+        function toggleAddRecord() {
+            const form = document.getElementById('addRecordForm');
+            form.classList.toggle('hidden');
+            document.getElementById('shareForm').classList.add('hidden');
+        }
+
+        function toggleShare() {
+            const form = document.getElementById('shareForm');
+            form.classList.toggle('hidden');
+            document.getElementById('addRecordForm').classList.add('hidden');
+        }
+</script>
+<script>
+async function selectChallenge(challengeId) {
+    selectedChallengeId = challengeId;
+
+    try {
+        // Try to load from user_challenges first (owned challenges)
+        let challengeResponse = await fetch(`${baseUrl}/user_challenges?challenge_id=eq.${challengeId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        let challenges = await challengeResponse.json();
+
+        // If not found in owned challenges, try shared_challenges
+        if (!challenges.length) {
+            challengeResponse = await fetch(`${baseUrl}/shared_challenges?challenge_id=eq.${challengeId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            challenges = await challengeResponse.json();
+        }
+
+        if (!challenges.length) {
+            throw new Error('Challenge not found');
+        }
+
+        const challenge = challenges[0];
+
+        // Load share visibility (if the challenge is owned)
+        const visibilityResponse = await fetch(`${baseUrl}/challenge_shares_visibility?challenge_id=eq.${challengeId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        const shareVisibility = await visibilityResponse.json();
+
+        // Update UI elements
+        document.getElementById('selectedChallengeName').textContent = challenge.name;
+        document.getElementById('selectedChallengeDates').textContent = "Event from: " + challenge.from + " to: " + challenge.to;
+        document.getElementById('challengeDetails').classList.remove('hidden'); // Show the Challenge Details section
+
+        // Show/hide action buttons based on ownership
+        const isOwned = 'owner_email' in challenge && challenge.owner_email !== challenge.user_email;
+        document.querySelector('button[onclick="toggleAddRecord()"]').style.display = 'inline-block'; // Always show add record
+        document.querySelector('button[onclick="toggleShare()"]').style.display = isOwned ? 'none' : 'inline-block'; // Only show share for owned challenges
+
+        // Update share visibility list (if the challenge is owned)
+        const visibilityList = document.getElementById('shareVisibilityList');
+        visibilityList.innerHTML = ''; 
+        if (!isOwned) { // Only show visibility settings for owned challenges
+            shareVisibility.forEach(share => {
+                const div = document.createElement('div');
+                div.className = 'p-2 bg-gray-50 rounded flex justify-between items-center';
+                div.innerHTML = `
+                    <span>${share.shared_with}</span>
+                    <span class="text-gray-600">Can see: ${share.can_see_progress ? 'Progress' : 'Limited'}</span>
+                `;
+                visibilityList.appendChild(div);
+            });
+        }
+
+        // Load records and shares
+        await Promise.all([
+            loadChallengeRecords(challengeId),
+            !isOwned ? loadChallengeShares(challengeId) : Promise.resolve()
+        ]);
+    } catch (error) {
+        alert('Failed to load challenge details: ' + error.message);
+        console.error(error);
+    }
+}
+
+
+    async function loadChallengeShares(challengeId) {
+        try {
+            const response = await fetch(`${baseUrl}/challenge_shares?challenge_id=eq.${challengeId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const shares = await response.json();
+            
+            const sharedWithList = document.getElementById('sharedWithList');
+            sharedWithList.innerHTML = '';
+            
+            shares.forEach(share => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center mb-2';
+                li.innerHTML = `
+                    <span>${share.shared_with}</span>
+                    <button onclick="removeShare(${share.share_id})" 
+                            class="text-red-500 hover:text-red-700">
+                        Remove
+                    </button>
+                `;
+                sharedWithList.appendChild(li);
+            });
+        } catch (error) {
+            alert('Failed to load challenge shares: ' + error.message);
+        }
+    }
+
+
+// Store color mappings for users
+const userColorMap = new Map();
+
+function getColorForUser(username) {
+  if (!userColorMap.has(username)) {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    userColorMap.set(username, color);
+  }
+  return userColorMap.get(username);
+}
+
+function updateProgressChart(recordsByUser) {
+  const ctx = document.getElementById('progressChart').getContext('2d');
+  if (progressChart) {
+    progressChart.destroy();
+  }
+  
+  const usernames = Object.keys(recordsByUser);
+  
+  const data = {
+    labels: usernames,
+    datasets: [{
+      label: 'Distance per user (km)',
+      data: Object.values(recordsByUser),
+      backgroundColor: usernames.map(user => `${getColorForUser(user)}80`), // Get color for each user
+      borderColor: usernames.map(getColorForUser), // Get color for each user
+      borderWidth: 1
+    }]
+  };
+  
+  progressChart = new Chart(ctx, {
+    type: 'bar',
+    data: data,
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Distance (km)'
+          }
+        }
+      }
+    }
+  });
+}
+
+function updateHistoryChart(historyData) {
+  const ctx = document.getElementById('historyChart').getContext('2d');
+  if (historyChart) {
+    historyChart.destroy();
+  }
+  
+  const datasets = Object.entries(historyData).map(([user, dataPoints]) => ({
+    label: user,
+    data: dataPoints,
+    fill: false,
+    borderColor: getColorForUser(user),
+    tension: 0.1
+  }));
+  
+  historyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            unit: 'day'
+          },
+          title: {
+            display: true,
+            text: 'Time'
+          }
+        },
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Cumulative Distance (km)'
+          }
+        }
+      }
+    }
+  });
+}
+
+async function addRecord() {
+    const timestamp = Math.floor(new Date(document.getElementById('recordTimestamp').value).getTime() / 1000);
+    const distance = parseFloat(document.getElementById('recordDistance').value);
+    const type = document.getElementById('recordType').value;
+
+    try {
+        // Insert record directly into challenge_records using the form input values
+        const recordResponse = await fetch(`${baseUrl}/challenge_records`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                challenge_id: selectedChallengeId,
+                timestamp: timestamp,
+                distance: distance,
+                type: type,
+                user: document.getElementById('email').value 
+            })
+        });
+
+        if (!recordResponse.ok) {
+            const error = await recordResponse.text();
+            throw new Error(error);
+        }
+
+        // Reset form and refresh data
+        document.getElementById('recordTimestamp').value = '';
+        document.getElementById('recordDistance').value = '';
+        document.getElementById('recordType').value = '';
+        document.getElementById('addRecordForm').classList.add('hidden');
+
+        await Promise.all([
+            loadChallengeRecords(selectedChallengeId),
+            loadRecentActivities()
+        ]);
+
+    } catch (error) {
+        alert('Failed to add record: ' + error.message);
+    }
+}
+
+
+    async function removeMyRecords() {
+    if (!confirm('Are you sure you want to delete all your records for this challenge?')) return;
+    
+    try {
+        const response = await fetch(`${baseUrl}/challenge_records?challenge_id=eq.${selectedChallengeId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete records');
+        }
+
+        // Refresh records and charts after deletion
+        await loadChallengeRecords(selectedChallengeId);
+        await loadRecentActivities();
+        alert('Your records have been successfully removed.');
+    } catch (error) {
+        alert('Failed to remove records: ' + error.message);
+    }
+}
+
+
+    async function shareChallenge() {
+        const email = document.getElementById('shareEmail').value;
+
+        try {
+            await fetch(`${baseUrl}/challenge_shares`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    challenge_id: selectedChallengeId,
+                    shared_with: email
+                })
+            });
+            
+            // Reset form and refresh data
+            document.getElementById('shareEmail').value = '';
+            document.getElementById('shareForm').classList.add('hidden');
+            await loadChallengeShares(selectedChallengeId);
+        } catch (error) {
+            alert('Failed to share challenge: ' + error.message);
+        }
+    }
+
+        async function removeShare(sharedWithEmail) {
+        if (!confirm(`Are you sure you want to remove the share with ${sharedWithEmail}?`)) return;
+
+        const loggedInEmail = document.getElementById('email').value;
+
+        try {
+            const response = await fetch(`${baseUrl}/challenge_shares`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    challenge_id: selectedChallengeId,
+                    shared_with: sharedWithEmail,
+                    created_by: loggedInEmail // Match the logged-in user's email
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(error);
+            }
+
+            // Refresh the shares list after deletion
+            await loadChallengeShares(selectedChallengeId);
+        } catch (error) {
+            alert('Failed to remove share: ' + error.message);
+        }
+    }
+
+
+
+
+// Table functionality
+class EnhancedTable {
+    constructor(tableId, searchInputId, paginationId) {
+        this.tableBody = document.getElementById(tableId);
+        this.searchInput = document.getElementById(searchInputId);
+        this.paginationContainer = document.getElementById(paginationId);
+        this.itemsPerPage = 10;
+        this.currentPage = 1;
+        this.sortColumn = null;
+        this.sortDirection = 'asc';
+        this.originalData = [];
+        this.filteredData = [];
+        this.filterInputs = this.tableBody.closest('table').querySelectorAll('.filter-input');
+        this.filters = {};
+        
+        this.initializeEventListeners();
+    }
+
+    initializeEventListeners() {
+        // Search functionality
+        this.searchInput?.addEventListener('input', () => {
+            this.currentPage = 1;
+            this.applyFiltersAndSort();
+        });
+
+        // Column filters
+        this.filterInputs.forEach(input => {
+            input.addEventListener('input', () => {
+                this.currentPage = 1;
+                this.filters[input.dataset.column] = input.value.toLowerCase();
+                this.applyFiltersAndSort();
+            });
+        });
+
+        // Sorting
+        const headers = this.tableBody.closest('table').querySelectorAll('th.sortable');
+        headers.forEach(header => {
+            header.addEventListener('click', () => {
+                const column = header.dataset.sort;
+                if (this.sortColumn === column) {
+                    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    this.sortColumn = column;
+                    this.sortDirection = 'asc';
+                }
+                
+                // Update sort indicators
+                headers.forEach(h => h.classList.remove('asc', 'desc'));
+                header.classList.add(this.sortDirection);
+                
+                this.applyFiltersAndSort();
+            });
+        });
+    }
+
+    setData(data) {
+        this.originalData = data;
+        this.applyFiltersAndSort();
+    }
+
+    applyFiltersAndSort() {
+        let filteredData = [...this.originalData];
+
+        // Apply column filters
+        Object.entries(this.filters).forEach(([column, value]) => {
+            if (value) {
+                filteredData = filteredData.filter(item => {
+                    const itemValue = String(this.getCellValue(item, column)).toLowerCase();
+                    return itemValue.includes(value);
+                });
+            }
+        });
+
+        // Apply search filter
+        if (this.searchInput?.value) {
+            const searchTerm = this.searchInput.value.toLowerCase();
+            filteredData = filteredData.filter(item => 
+                Object.values(item).some(value => 
+                    String(value).toLowerCase().includes(searchTerm)
+                )
+            );
+        }
+
+        // Apply sorting
+        if (this.sortColumn) {
+            filteredData.sort((a, b) => {
+                const aValue = this.getCellValue(a, this.sortColumn);
+                const bValue = this.getCellValue(b, this.sortColumn);
+                
+                if (typeof aValue === 'number' && typeof bValue === 'number') {
+                    return this.sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+                } else {
+                    const comparison = String(aValue).localeCompare(String(bValue));
+                    return this.sortDirection === 'asc' ? comparison : -comparison;
+                }
+            });
+
+        }
+
+        this.filteredData = filteredData;
+        this.renderPage();
+    }
+
+    getCellValue(item, column) {
+        // Handle special cases for complex objects or formatted values
+        switch (column) {
+            case 'time':
+            case 'date':
+                return new Date(item[column]).getTime();
+            case 'distance':
+                return parseFloat(item[column]);
+            default:
+                return item[column];
+        }
+    }
+
+    renderPage() {
+        const start = (this.currentPage - 1) * this.itemsPerPage;
+        const end = start + this.itemsPerPage;
+        const pageData = this.filteredData.slice(start, end);
+
+        // Clear existing rows
+        while (this.tableBody.firstChild) {
+            this.tableBody.removeChild(this.tableBody.firstChild);
+        }
+
+        // Render new rows
+        pageData.forEach(item => {
+            const row = this.createRow(item);
+            this.tableBody.appendChild(row);
+        });
+
+        this.renderPagination();
+    }
+
+    createRow(item) {
+        const row = document.createElement('tr');
+        row.classList.add('hover:bg-gray-100', 'cursor-pointer'); 
+        // Add cursor pointer for visual feedback
+
+        // Attach the onclick event here
+        row.onclick = () => selectChallenge(item.challenge_id);
+        
+        // Get table headers to determine which columns to display
+        const headers = Array.from(this.tableBody.closest('table').querySelectorAll('thead th:not(:has(input))'));
+        
+        headers.forEach(header => {
+            const column = header.dataset.sort;
+            if (!column) return;
+
+            const cell = document.createElement('td');
+            cell.classList.add('p-2');
+
+            let value = item[column];
+            
+            // Format special values
+            switch (column) {
+                case 'time':
+                case 'date':
+                    value = new Date(item[column]).toLocaleString();
+                    break;
+                case 'distance':
+                    value = `${parseFloat(item[column]).toFixed(1)} km`;
+                    break;
+            }
+
+            cell.textContent = value;
+            row.appendChild(cell);
+        });
+
+        // Add action buttons if necessary
+        if (item.actions) {
+            const actionsCell = document.createElement('td');
+            actionsCell.classList.add('p-2');
+            actionsCell.innerHTML = item.actions;
+            row.appendChild(actionsCell);
+        }
+
+        return row;
+    }
+
+    renderPagination() {
+        if (!this.paginationContainer) return;
+
+        const totalPages = Math.ceil(this.filteredData.length / this.itemsPerPage);
+        this.paginationContainer.innerHTML = '';
+
+        if (totalPages <= 1) return;
+
+        // Previous button
+        const prevButton = this.createPaginationButton('Previous', this.currentPage > 1);
+        prevButton.addEventListener('click', () => this.goToPage(this.currentPage - 1));
+        this.paginationContainer.appendChild(prevButton);
+
+        // Page numbers
+        for (let i = 1; i <= totalPages; i++) {
+            if (
+                i === 1 || 
+                i === totalPages || 
+                (i >= this.currentPage - 2 && i <= this.currentPage + 2)
+            ) {
+                const pageButton = this.createPaginationButton(i.toString(), true);
+                if (i === this.currentPage) {
+                    pageButton.classList.add('bg-blue-500', 'text-white');
+                }
+                pageButton.addEventListener('click', () => this.goToPage(i));
+                this.paginationContainer.appendChild(pageButton);
+            } else if (
+                i === this.currentPage - 3 || 
+                i === this.currentPage + 3
+            ) {
+                const ellipsis = document.createElement('span');
+                ellipsis.textContent = '...';
+                ellipsis.classList.add('px-2');
+                this.paginationContainer.appendChild(ellipsis);
+            }
+        }
+
+        // Next button
+        const nextButton = this.createPaginationButton('Next', this.currentPage < totalPages);
+        nextButton.addEventListener('click', () => this.goToPage(this.currentPage + 1));
+        this.paginationContainer.appendChild(nextButton);
+    }
+
+    createPaginationButton(text, enabled) {
+        const button = document.createElement('button');
+        button.textContent = text;
+        button.classList.add('px-3', 'py-1', 'border', 'rounded');
+        
+        if (enabled) {
+            button.classList.add('hover:bg-gray-100');
+        } else {
+            button.disabled = true;
+            button.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+        
+        return button;
+    }
+
+    goToPage(page) {
+        this.currentPage = page;
+        this.renderPage();
+    }
+}
+
+// Initialize tables
+document.addEventListener('DOMContentLoaded', () => {
+    const tables = {
+        activities: new EnhancedTable(
+            'activitiesTableBody',
+            'activitiesSearchInput',
+            'activitiesPagination'
+        ),
+        challenges: new EnhancedTable(
+            'challengesTableBody',
+            'challengesSearchInput',
+            'challengesPagination'
+        ),
+        sharedChallenges: new EnhancedTable(
+            'sharedChallengesTableBody',
+            'sharedSearchInput',
+            'sharedChallengesPagination'
+        ),
+        records: new EnhancedTable(
+            'recordsTableBody',
+            'recordsSearchInput',
+            'recordsPagination'
+        )
+    };
+
+    // Expose tables to global scope for use in other functions
+    window.tables = tables;
+});
+
+// Update the loadChallenges function to use the table
+async function loadChallenges() {
+    try {
+        const response = await fetch(`${baseUrl}/challenge_list`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        const challenges = await response.json();
+
+        // Add action buttons as part of the challenge data
+        const challengesWithActions = challenges.map(challenge => ({
+            ...challenge,
+            challenge_id: challenge.challenge_id,
+            actions: `<button onclick="deleteChallenge(${challenge.challenge_id}); event.stopPropagation();" 
+                      class="bg-red-500 text-white px-2 py-1 rounded">Delete</button>`
+        }));
+
+        // Sort challenges by 'from' date in descending order
+        challengesWithActions.sort((a, b) => new Date(b.from) - new Date(a.from));
+
+        // Update table data
+        window.tables.challenges.setData(challengesWithActions);
+    } catch (error) {
+        alert('Failed to load challenges: ' + error.message);
+    }
+}
+
+
+
+// Update other load functions similarly
+async function loadSharedChallenges() {
+    try {
+        const response = await fetch(`${baseUrl}/shared_challenges`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        const challenges = await response.json();
+
+        // Map challenges to include an 'owner' field using 'created_by' column
+        const challengesWithOwner = challenges.map(challenge => ({
+            ...challenge,
+            owner: challenge.created_by  // Add 'owner' field from 'created_by'
+        }));
+
+        window.tables.sharedChallenges.setData(challengesWithOwner);
+    } catch (error) {
+        alert('Failed to load shared challenges: ' + error.message);
+    }
+}
+
+
+async function loadRecentActivities() {
+    try {
+        const response = await fetch(`${baseUrl}/shared_challenge_records?order=timestamp.desc&limit=5`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        const activities = await response.json();
+
+        // Convert Unix timestamps to valid Date format
+        activities.forEach(activity => {
+            if (activity.timestamp) {
+                activity.timestamp = new Date(activity.timestamp * 1000).toISOString();
+            }
+        });
+
+        // Insert rows into the table body
+        const activitiesTableBody = document.getElementById("activitiesTableBody");
+        activitiesTableBody.innerHTML = ''; // Clear existing rows
+
+        activities.forEach(activity => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td class="p-2">${activity.challenge_id}</td>
+                <td class="p-2">${new Date(activity.timestamp).toLocaleString()}</td>
+                <td class="p-2">${activity.user}</td>
+                <td class="p-2">${activity.type}</td>
+                <td class="p-2">${activity.distance}</td>
+            `;
+            activitiesTableBody.appendChild(row);
+        });
+
+        // Handle pagination if necessary
+        //updatePagination(activities.length); // If you have a pagination function
+    } catch (error) {
+        alert('Failed to load recent activities: ' + error.message);
+    }
+}
+
+
+
+async function loadChallengeRecords(challengeId) {
+  try {
+    const response = await fetch(`${baseUrl}/shared_challenge_records?challenge_id=eq.${challengeId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    let records = await response.json();
+
+    // Deduplicate records based on unique combination of user, timestamp, and distance
+    records = Array.from(new Map(
+      records.map(record => [
+        JSON.stringify({
+          user: record.user,
+          timestamp: record.timestamp,
+          distance: record.distance
+        }),
+        record
+      ])
+    ).values());
+
+    // Convert Unix timestamps to valid Date format (ISO string)
+    records.forEach(record => {
+      if (record.timestamp) {
+        record.timestamp = new Date(record.timestamp * 1000).toISOString();
+      }
+    });
+
+    // Sort records by timestamp in descending order (newest first)
+    records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Insert rows into the records table
+    const recordsTableBody = document.getElementById("recordsTableBody");
+    recordsTableBody.innerHTML = ''; // Clear existing rows
+    
+    records.forEach(record => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td class="p-2">${record.user}</td>
+        <td class="p-2">${new Date(record.timestamp).toLocaleString()}</td>
+        <td class="p-2">${record.distance}</td>
+      `;
+      recordsTableBody.appendChild(row);
+    });
+
+    // Process data for charts
+    const recordsByUser = {};
+    const historyData = {};
+    
+    records.forEach(record => {
+      if (!recordsByUser[record.user]) {
+        recordsByUser[record.user] = 0;
+      }
+      recordsByUser[record.user] += record.distance;
+
+      if (!historyData[record.user]) {
+        historyData[record.user] = [];
+      }
+      historyData[record.user].push({
+        timestamp: new Date(record.timestamp),
+        distance: record.distance
+      });
+    });
+
+    // Sort and accumulate distances for history chart
+    for (const user in historyData) {
+      historyData[user].sort((a, b) => a.timestamp - b.timestamp);
+      let cumulativeDistance = 0;
+      historyData[user] = historyData[user].map(record => {
+        cumulativeDistance += record.distance;
+        return {
+          x: record.timestamp,
+          y: cumulativeDistance
+        };
+      });
+    }
+
+    // Update charts
+    updateProgressChart(recordsByUser);
+    updateHistoryChart(historyData);
+  } catch (error) {
+    alert('Failed to load challenge records: ' + error.message);
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+services:
+
+# To add new users run: $ docker exec -it db_challenges bash add-user.sh username="test@example.com" password="securepassword"
+
+  postgrest_challenges:
+    container_name: postgrest_challenges
+    image: postgrest/postgrest:v12.2.3
+    ports:
+      - "3000:3000"
+    networks:
+      - challenges
+    environment:
+      PGRST_DB_URI: postgres://challenges_user:POSTGRES_PASSWORD@db_challenges:5432/challenges
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://127.0.0.1:3000
+      PGRST_DB_SCHEMAS: "challenges, public, basic_auth"
+      PGRST_DB_ANON_ROLE: "web_anon"  
+      PGRST_LOG_LEVEL: "debug"
+      # jwt must be 32 characters:
+      PGRST_JWT_SECRET: "reallyreallyreallyreallyverysafe"
+    depends_on:
+      - db_challenges
+    logging:
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  db_challenges:
+    image: postgres-challenges:local
+    container_name: db_challenges
+    #ports:
+    #  - "5432:5432"
+    networks:
+      - challenges
+    environment:
+      POSTGRES_DB: challenges
+      POSTGRES_USER: challenges_user
+      POSTGRES_PASSWORD: POSTGRES_PASSWORD
+      JWT_SECRET: "reallyreallyreallyreallyverysafe"
+      AUTHENTICATOR_PASSWORD: AUTHENTICATOR_PASSWORD
+      # uncomment to add users via env variables:
+      #USER1_EMAIL: "localhost@example.org"
+      #USER1_PASSWORD: securepassword
+    volumes:
+      - "./pgdata:/var/lib/postgresql/data"
+    logging:
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  challenges-web-ui:
+    image: nginx:latest
+    container_name: challenges-ui
+    depends_on:
+      - db_challenges
+      - postgrest_challenges
+    ports:
+      - "81:80"
+    networks:
+      - challenges
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+networks:
+  challenges:
+    external: false
